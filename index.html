@@ -248,7 +248,7 @@
                 this.isDashExpanded = false;
                 this.searchTimeout = null;
                 this.isComposing = false;
-                this.abortController = null; // ★追加：通信キャンセル用のコントローラー
+                this.abortController = null;
 
                 this.dom = {
                     authBtn: document.getElementById('auth-btn'),
@@ -337,7 +337,7 @@
                 this.dom.addSongBtn.addEventListener('click', () => this.handleAddSong());
                 this.dom.importBtn.addEventListener('click', () => this.handleCSVImport());
                 
-                // Simeji IME対応
+                // Simeji / iOS IME入力対応
                 this.dom.inputTitle.addEventListener('compositionstart', () => {
                     this.isComposing = true;
                 });
@@ -431,16 +431,16 @@
                 this.render();
             }
 
-            // ★ 修正：AbortControllerを用いて通信の重複をキャンセルし、iTunes APIを直接叩く
+            // ★ MusicBrainz APIによる正確な「曲名」と「アーティスト名」の自動補完
             handleAutocomplete(keyword) {
                 clearTimeout(this.searchTimeout);
-                
-                // 前回の検索通信がまだ終わっていなければキャンセルする
+
                 if (this.abortController) {
                     this.abortController.abort();
                 }
 
-                if (!keyword.trim()) {
+                const query = keyword.trim();
+                if (!query) {
                     this.dom.autocompleteList.style.display = 'none';
                     return;
                 }
@@ -448,29 +448,49 @@
                 this.dom.autocompleteList.innerHTML = `<li class="text-center text-slate-400 text-xs py-3"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>検索中...</li>`;
                 this.dom.autocompleteList.style.display = 'block';
 
-                // 待機時間を 400ms に短縮
                 this.searchTimeout = setTimeout(async () => {
-                    this.abortController = new AbortController(); // 新しい通信用のコントローラー
-                    
-                    try {
-                        // 不安定なプロキシを廃止し、iTunes APIを直接叩く
-                        const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&media=music&entity=song&lang=ja_jp&country=JP&limit=5`;
+                    this.abortController = new AbortController();
 
-                        const res = await fetch(targetUrl, { signal: this.abortController.signal });
-                        if (!res.ok) throw new Error('API Error');
-                        const data = await res.json();
+                    try {
+                        // MusicBrainz 楽曲検索API (CORS完全対応・JSON形式)
+                        const apiUrl = `https://musicbrainz.org/ws/2/recording?query=recording:${encodeURIComponent(query)}&fmt=json&limit=7`;
+
+                        const res = await fetch(apiUrl, { signal: this.abortController.signal });
+                        if (!res.ok) throw new Error('MusicBrainz API Error');
                         
+                        const data = await res.json();
+                        const recordings = data.recordings || [];
+
                         this.dom.autocompleteList.innerHTML = '';
-                        if (data.results && data.results.length > 0) {
-                            data.results.forEach(song => {
+                        if (recordings.length > 0) {
+                            // 重複する「曲名＋アーティスト名」を除去して表示
+                            const seen = new Set();
+
+                            recordings.forEach(rec => {
+                                const songTitle = rec.title || '';
+                                const artistName = (rec['artist-credit'] && rec['artist-credit'].length > 0)
+                                    ? rec['artist-credit'].map(a => a.name).join(' ')
+                                    : 'アーティスト不明';
+
+                                const key = `${songTitle}___${artistName}`;
+                                if (seen.has(key) || !songTitle) return;
+                                seen.add(key);
+
                                 const li = document.createElement('li');
-                                li.innerHTML = `<div class="font-bold text-sm truncate pointer-events-none">${song.trackName}</div><div class="text-[10px] text-slate-400 truncate pointer-events-none">${song.artistName}</div>`;
+                                li.innerHTML = `
+                                    <div class="font-bold text-sm text-white truncate pointer-events-none">${songTitle}</div>
+                                    <div class="text-[10px] text-pink-300/80 truncate pointer-events-none flex items-center gap-1 mt-0.5">
+                                        <i class="fa-solid fa-microphone-lines text-[9px] opacity-70"></i> ${artistName}
+                                    </div>
+                                `;
                                 
                                 const selectItem = (e) => {
                                     e.preventDefault(); 
                                     e.stopPropagation();
-                                    this.dom.inputTitle.value = song.trackName;
-                                    this.dom.inputArtist.value = song.artistName;
+                                    
+                                    // 曲名とアーティスト名をそれぞれ自動入力
+                                    this.dom.inputTitle.value = songTitle;
+                                    this.dom.inputArtist.value = artistName;
                                     this.dom.autocompleteList.style.display = 'none';
                                 };
                                 
@@ -479,16 +499,20 @@
                                 
                                 this.dom.autocompleteList.appendChild(li);
                             });
-                            this.dom.autocompleteList.style.display = 'block';
+
+                            if (this.dom.autocompleteList.children.length === 0) {
+                                this.dom.autocompleteList.innerHTML = `<li class="text-center text-slate-400 text-xs py-3">候補が見つかりません</li>`;
+                            } else {
+                                this.dom.autocompleteList.style.display = 'block';
+                            }
                         } else {
                             this.dom.autocompleteList.innerHTML = `<li class="text-center text-slate-400 text-xs py-3">候補が見つかりません</li>`;
                         }
                     } catch (err) {
-                        // AbortError(通信のキャンセル)の場合はエラーとして扱わない
                         if (err.name === 'AbortError') return;
 
                         console.error("Autocomplete fetch error:", err);
-                        this.dom.autocompleteList.innerHTML = `<li class="text-center text-red-400 text-xs py-3"><i class="fa-solid fa-triangle-exclamation mr-2"></i>通信エラー (時間をおいてお試しください)</li>`;
+                        this.dom.autocompleteList.innerHTML = `<li class="text-center text-red-400 text-xs py-3"><i class="fa-solid fa-triangle-exclamation mr-2"></i>候補の取得に失敗しました</li>`;
                     }
                 }, 400); 
             }
