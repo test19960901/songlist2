@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>歌える曲リスト (リアルタイム同期版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+
+        /* サジェストリストのデザイン */
+        .autocomplete-dropdown {
+            position: absolute; z-index: 999; background: #1e293b; border: 1px solid #334155;
+            border-radius: 1rem; max-height: 200px; overflow-y: auto; width: 100%;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7); display: none; color: white; top: calc(100% + 4px);
+        }
+        .autocomplete-dropdown li { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #334155; }
+        .autocomplete-dropdown li:last-child { border-bottom: none; }
+        .autocomplete-dropdown li:hover, .autocomplete-dropdown li:active { background-color: #334155; }
+
+        .glass-header {
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .gradient-text {
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .active-scale:active { transform: scale(0.95); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen pb-24 selection:bg-pink-500 selection:text-white">
+
+    <!-- ヘッダー -->
+    <header class="glass-header sticky top-0 z-50 border-b border-white/10">
+        <div class="px-4 py-3 flex justify-between items-center pt-safe">
+            <h1 class="text-xl font-extrabold tracking-tight">
+                <span class="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 gradient-text">
+                    <i class="fa-solid fa-music mr-1"></i> SongList
+                </span>
+            </h1>
+            <button id="auth-btn" class="active-scale text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-1.5 rounded-full backdrop-blur-md transition-all">
+                <i class="fa-solid fa-lock mr-1"></i> 管理者
+            </button>
+        </div>
+    </header>
+
+    <main class="px-4 mt-4 max-w-xl mx-auto">
+        <!-- ローディング表示 -->
+        <div id="loading-indicator" class="text-center py-10 text-slate-500">
+            <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-2 text-cyan-400"></i>
+            <p class="font-bold text-sm">データベースと同期中...</p>
+        </div>
+
+        <div id="main-content" class="hidden">
+            <!-- 検索・フィルターエリア -->
+            <section class="mb-5 space-y-2.5">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-3 text-slate-400 text-sm"></i>
+                    <input type="text" id="search-keyword" autocomplete="off" class="w-full bg-slate-800 border border-slate-700 text-white rounded-full pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-purple-500 outline-none transition-shadow placeholder-slate-400 text-sm shadow-inner" placeholder="曲名やアーティスト名で検索...">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="relative">
+                        <select id="filter-category" class="w-full appearance-none bg-slate-800 border border-slate-700 text-slate-200 rounded-full pl-4 pr-10 py-2 text-xs focus:ring-2 focus:ring-cyan-500 outline-none shadow-sm">
+                            <option value="">全てのカテゴリー</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-2.5 text-slate-400 text-[10px] pointer-events-none"></i>
+                    </div>
+                    <div class="relative">
+                        <select id="sort-type" class="w-full appearance-none bg-slate-800 border border-slate-700 text-slate-200 rounded-full pl-4 pr-10 py-2 text-xs focus:ring-2 focus:ring-pink-500 outline-none shadow-sm">
+                            <option value="newest">追加日が新しい順</option>
+                            <option value="syllabary">五十音順 (曲名)</option>
+                            <option value="likes">人気順</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-4 top-2.5 text-slate-400 text-[10px] pointer-events-none"></i>
+                    </div>
+                </div>
+                
+                <div class="text-right text-[11px] text-slate-400 font-medium">
+                    全 <span id="song-count" class="text-white font-bold mx-0.5 text-sm">0</span> 曲
+                </div>
+            </section>
+
+            <!-- 管理エリア (修正: overflow-hidden を外し、内部にラッパーを追加) -->
+            <section id="admin-area" class="bg-slate-800/80 rounded-2xl p-4 mb-6 hidden border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] relative z-40">
+                <!-- 光彩エフェクト専用のオーバーフロー隠しラッパー -->
+                <div class="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl"></div>
+                </div>
+
+                <h2 class="text-base font-extrabold mb-4 text-white flex items-center relative z-10">
+                    <i class="fa-solid fa-bolt text-purple-400 mr-2"></i> CREATOR STUDIO
+                </h2>
+
+                <!-- インサイト・ダッシュボード -->
+                <div class="mb-6 relative z-10">
+                    <h3 class="text-xs font-bold text-white mb-2 flex items-center">
+                        <i class="fa-solid fa-chart-pie mr-2 text-cyan-400"></i> ダッシュボード
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div class="bg-slate-900/50 rounded-xl p-2 border border-slate-700/50 text-center flex flex-col justify-center">
+                            <div class="text-[9px] text-slate-400 mb-0.5 font-bold">登録曲数</div>
+                            <div class="text-lg font-black text-white" id="dash-total-songs">0</div>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-2 border border-pink-500/30 text-center relative overflow-hidden">
+                            <div class="text-[9px] text-pink-300/80 mb-0.5 font-bold relative z-10">総いいね</div>
+                            <div class="text-lg font-black text-pink-400 relative z-10" id="dash-total-likes">0</div>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-2 border border-orange-500/30 text-center relative overflow-hidden">
+                            <div class="text-[9px] text-orange-300/80 mb-0.5 font-bold relative z-10">総リクエスト</div>
+                            <div class="text-lg font-black text-orange-400 relative z-10" id="dash-requested">0</div>
+                        </div>
+                        <div class="bg-slate-900/50 rounded-xl p-2 border border-red-500/30 text-center relative overflow-hidden">
+                            <div class="text-[9px] text-red-300/80 mb-0.5 font-bold relative z-10">総再生(聴く)</div>
+                            <div class="text-lg font-black text-red-400 relative z-10" id="dash-total-listens">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm whitespace-nowrap">
+                                <thead class="bg-slate-800/80 text-slate-400 text-[9px] uppercase tracking-wider border-b border-slate-700/50">
+                                    <tr id="dash-table-header"></tr>
+                                </thead>
+                                <tbody id="dash-table-body" class="divide-y divide-slate-700/50 text-[10px]"></tbody>
+                            </table>
+                        </div>
+                        <div id="dash-expand-container" class="border-t border-slate-700/50 p-1.5 text-center hidden bg-slate-800/30">
+                            <button id="dash-expand-btn" class="active-scale text-[10px] text-cyan-400 hover:text-cyan-300 font-bold py-1 px-3 rounded-full transition w-full flex justify-center items-center"></button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 登録・設定フォーム -->
+                <div class="space-y-5 relative z-10">
+                    <div class="grid grid-cols-1 gap-3 pb-4 border-b border-slate-700/50">
+                        <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                            <h3 class="text-[11px] font-bold text-slate-300 mb-2"><i class="fa-solid fa-file-csv mr-1 text-green-400"></i> 一括インポート</h3>
+                            <div class="flex items-center gap-2">
+                                <input type="file" id="csv-file" accept=".csv" class="text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 w-full">
+                                <button id="import-btn" class="active-scale bg-green-500/20 text-green-400 border border-green-500/30 px-2.5 py-1 rounded-full text-[10px] font-bold">追加</button>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                            <h3 class="text-[11px] font-bold text-slate-300 mb-2"><i class="fa-solid fa-key mr-1 text-yellow-400"></i> パスワード変更</h3>
+                            <form id="change-pass-form" class="flex items-center gap-2">
+                                <input type="text" id="input-new-pass" required class="bg-slate-800 border border-slate-600 rounded-full px-3 py-1 text-xs text-white w-full focus:outline-none focus:border-yellow-500" placeholder="新しいパスワード">
+                                <button type="submit" class="active-scale bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2.5 py-1 rounded-full text-[10px] font-bold">更新</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold text-white mb-2"><i class="fa-solid fa-plus-circle mr-1 text-pink-400"></i> 新規曲登録</h3>
+                        <form id="add-song-form" class="space-y-3 relative">
+                            <div class="relative">
+                                <!-- iOSでサジェストが出やすいようにautocomplete="off" -->
+                                <input type="text" id="input-title" required autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="曲名 (入力で自動検索)">
+                                <!-- サジェストリスト -->
+                                <ul id="autocomplete-list" class="autocomplete-dropdown"></ul>
+                            </div>
+                            <input type="text" id="input-artist" required autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="アーティスト名">
+                            <div class="flex gap-2">
+                                <input type="text" id="input-category" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="カテゴリ (任意)">
+                                <input type="text" id="input-tags" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="タグ (任意)">
+                            </div>
+                            <button type="submit" class="active-scale w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white font-extrabold py-2.5 rounded-xl shadow-lg shadow-pink-500/30 flex justify-center items-center gap-1.5 text-sm">
+                                <i class="fa-solid fa-music"></i> 追加する
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- リストエリア -->
+            <section id="song-list" class="space-y-2.5">
+                <!-- JSで描画 -->
+            </section>
+        </div>
+    </main>
+
+    <!-- 編集用モーダル -->
+    <div id="edit-modal" class="fixed inset-0 bg-black/80 z-[100] hidden flex-col justify-center items-center p-4 backdrop-blur-md">
+        <div class="w-full max-w-sm bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-2xl animate-fade-in">
+            <h3 class="text-base font-bold text-white mb-4"><i class="fa-solid fa-pen text-blue-400 mr-2"></i>曲情報の編集</h3>
+            <form id="edit-form" class="space-y-4">
+                <input type="hidden" id="edit-song-id">
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">曲名 / アーティスト</label>
+                    <div id="edit-song-name" class="text-xs text-slate-200 font-bold bg-slate-900/50 p-2.5 rounded-xl border border-slate-700/50"></div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">カテゴリー</label>
+                    <input type="text" id="edit-category" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-medium text-slate-400 mb-1">タグ (スペース区切り)</label>
+                    <input type="text" id="edit-tags" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="edit-cancel-btn" class="active-scale px-4 py-2 rounded-xl text-xs font-bold bg-slate-700 text-white hover:bg-slate-600 transition">キャンセル</button>
+                    <button type="submit" class="active-scale px-4 py-2 rounded-xl text-xs font-bold bg-blue-500 text-white hover:bg-blue-600 transition">保存する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (互換バージョン) -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // =========================================================================
+        // ★ここに控えておいた firebaseConfig の中身を貼り付けてください★
+        // =========================================================================
+        const firebaseConfig = {
+  apiKey: "AIzaSyDMISzXc08qCEEcUybBAiHanC2KFekM9Hc",
+  authDomain: "songlist-4e2db.firebaseapp.com",
+  projectId: "songlist-4e2db",
+  storageBucket: "songlist-4e2db.firebasestorage.app",
+  messagingSenderId: "514651704919",
+  appId: "1:514651704919:web:b19403ea49a181e612dd12",
+  measurementId: "G-L5HLRS15Q1"
+};
+
+        const fbApp = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        class SongListApp {
+            constructor() {
+                this.passKey = 'songListAuthPass';
+                this.userActionsKey = 'mySongActions'; 
+
+                this.adminPassword = localStorage.getItem(this.passKey) || 'admin123';
+                this.isAdmin = false;
+                this.songs = [];
+                
+                this.myActions = JSON.parse(localStorage.getItem(this.userActionsKey)) || { likes: [], requests: [] };
+                this.dashSort = { key: 'requestCount', order: 'desc' };
+                this.isDashExpanded = false;
+                this.searchTimeout = null;
+
+                this.dom = {
+                    authBtn: document.getElementById('auth-btn'),
+                    adminArea: document.getElementById('admin-area'),
+                    dashTotalSongs: document.getElementById('dash-total-songs'),
+                    dashTotalLikes: document.getElementById('dash-total-likes'),
+                    dashRequested: document.getElementById('dash-requested'),
+                    dashTotalListens: document.getElementById('dash-total-listens'),
+                    dashTableHeader: document.getElementById('dash-table-header'),
+                    dashTableBody: document.getElementById('dash-table-body'),
+                    dashExpandContainer: document.getElementById('dash-expand-container'),
+                    dashExpandBtn: document.getElementById('dash-expand-btn'),
+                    csvFile: document.getElementById('csv-file'),
+                    importBtn: document.getElementById('import-btn'),
+                    changePassForm: document.getElementById('change-pass-form'),
+                    inputNewPass: document.getElementById('input-new-pass'),
+                    addForm: document.getElementById('add-song-form'),
+                    inputTitle: document.getElementById('input-title'),
+                    inputArtist: document.getElementById('input-artist'),
+                    inputCategory: document.getElementById('input-category'),
+                    inputTags: document.getElementById('input-tags'),
+                    autocompleteList: document.getElementById('autocomplete-list'),
+                    searchKeyword: document.getElementById('search-keyword'),
+                    filterCategory: document.getElementById('filter-category'),
+                    sortType: document.getElementById('sort-type'),
+                    songList: document.getElementById('song-list'),
+                    songCount: document.getElementById('song-count'),
+                    editModal: document.getElementById('edit-modal'),
+                    editForm: document.getElementById('edit-form'),
+                    editSongId: document.getElementById('edit-song-id'),
+                    editSongName: document.getElementById('edit-song-name'),
+                    editCategory: document.getElementById('edit-category'),
+                    editTags: document.getElementById('edit-tags'),
+                    editCancelBtn: document.getElementById('edit-cancel-btn'),
+                    loadingIndicator: document.getElementById('loading-indicator'),
+                    mainContent: document.getElementById('main-content')
+                };
+
+                window.app = this;
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.subscribeToFirestore();
+            }
+
+            subscribeToFirestore() {
+                if (!firebaseConfig.apiKey) {
+                    alert("エラー：firebaseConfig が設定されていません。コード内を書き換えてください。");
+                    return;
+                }
+
+                db.collection("songs").onSnapshot((snapshot) => {
+                    this.songs = [];
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        this.songs.push({
+                            id: doc.id,
+                            title: data.title,
+                            artist: data.artist,
+                            category: data.category || "未分類",
+                            tags: data.tags || [],
+                            likes: data.likes || 0,
+                            requestCount: data.requestCount || 0,
+                            listenCount: data.listenCount || 0,
+                            createdAt: data.createdAt ? data.createdAt.toMillis() : Date.now()
+                        });
+                    });
+                    
+                    this.dom.loadingIndicator.classList.add('hidden');
+                    this.dom.mainContent.classList.remove('hidden');
+
+                    this.updateCategoryOptions();
+                    this.render();
+                }, (error) => {
+                    console.error("Firestore読み込みエラー:", error);
+                    alert("データベースに接続できません。Firebaseの設定かセキュリティルールを確認してください。\n詳細: " + error.message);
+                });
+            }
+
+            bindEvents() {
+                this.dom.authBtn.addEventListener('click', () => this.toggleAuth());
+                this.dom.changePassForm.addEventListener('submit', (e) => this.handleChangePassword(e));
+                this.dom.addForm.addEventListener('submit', (e) => this.handleAddSong(e));
+                this.dom.importBtn.addEventListener('click', () => this.handleCSVImport());
+                
+                this.dom.inputTitle.addEventListener('input', (e) => this.handleAutocomplete(e.target.value));
+                
+                // サジェストリスト以外を触った時に閉じる（blurだとiOSでバグるため遅延処理）
+                this.dom.inputTitle.addEventListener('blur', () => {
+                    setTimeout(() => {
+                        this.dom.autocompleteList.style.display = 'none';
+                    }, 250);
+                });
+
+                this.dom.searchKeyword.addEventListener('input', () => this.render());
+                this.dom.filterCategory.addEventListener('change', () => this.render());
+                this.dom.sortType.addEventListener('change', () => this.render());
+
+                this.dom.dashExpandBtn.addEventListener('click', () => {
+                    this.isDashExpanded = !this.isDashExpanded;
+                    this.renderDashboard();
+                });
+
+                this.dom.editForm.addEventListener('submit', (e) => this.handleEditSong(e));
+                this.dom.editCancelBtn.addEventListener('click', () => this.closeEditModal());
+                this.dom.editModal.addEventListener('click', (e) => {
+                    if (e.target === this.dom.editModal) this.closeEditModal();
+                });
+            }
+
+            saveMyActions() {
+                localStorage.setItem(this.userActionsKey, JSON.stringify(this.myActions));
+            }
+
+            async openYouTubeSearch(id, title, artist) {
+                const query = `${title} ${artist}`;
+                const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+                const width = 450, height = 700;
+                const left = window.screenX + (window.outerWidth - width) / 2;
+                const top = window.screenY + (window.outerHeight - height) / 2;
+                window.open(ytSearchUrl, 'ytPopup', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`);
+
+                try {
+                    await db.collection("songs").doc(id).update({
+                        listenCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                } catch (error) {
+                    console.error("再生回数更新エラー:", error);
+                }
+            }
+
+            handleChangePassword(e) {
+                e.preventDefault();
+                const newPass = this.dom.inputNewPass.value.trim();
+                if (!newPass) return;
+                if (confirm(`パスワードを「${newPass}」に変更しますか？\n次回以降のログインで必要です。`)) {
+                    this.adminPassword = newPass;
+                    localStorage.setItem(this.passKey, newPass);
+                    this.dom.inputNewPass.value = '';
+                    alert("パスワードを変更しました！");
+                }
+            }
+
+            toggleAuth() {
+                if (this.isAdmin) {
+                    this.isAdmin = false;
+                    this.dom.authBtn.innerHTML = '<i class="fa-solid fa-lock mr-1"></i> 管理者';
+                    this.dom.authBtn.className = 'active-scale text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-1.5 rounded-full backdrop-blur-md transition-all';
+                    this.dom.adminArea.classList.add('hidden');
+                } else {
+                    const pass = prompt(`管理者パスワードを入力してください`);
+                    if (pass === this.adminPassword) {
+                        this.isAdmin = true;
+                        this.dom.authBtn.innerHTML = '<i class="fa-solid fa-unlock mr-1"></i> 終了';
+                        this.dom.authBtn.className = 'active-scale text-xs font-bold bg-pink-500 hover:bg-pink-600 text-white border border-pink-400 shadow-[0_0_10px_rgba(236,72,153,0.5)] px-3 py-1.5 rounded-full transition-all';
+                        this.dom.adminArea.classList.remove('hidden');
+                    } else if (pass !== null) {
+                        alert("パスワードが違います。");
+                    }
+                }
+                this.render();
+            }
+
+            // iOS対応版 サジェスト機能（fetchを利用し、タッチイベントを強化）
+            handleAutocomplete(keyword) {
+                clearTimeout(this.searchTimeout);
+                if (!keyword.trim()) {
+                    this.dom.autocompleteList.style.display = 'none';
+                    return;
+                }
+
+                this.searchTimeout = setTimeout(async () => {
+                    try {
+                        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&media=music&entity=song&lang=ja_jp&country=JP&limit=5`);
+                        if (!res.ok) throw new Error('API Error');
+                        const data = await res.json();
+                        
+                        this.dom.autocompleteList.innerHTML = '';
+                        if (data.results && data.results.length > 0) {
+                            data.results.forEach(song => {
+                                const li = document.createElement('li');
+                                li.innerHTML = `<div class="font-bold text-sm truncate">${song.trackName}</div><div class="text-[10px] text-slate-400 truncate">${song.artistName}</div>`;
+                                
+                                // iOSでのタップ判定抜けを防ぐため、pointerdownで即座に処理
+                                li.addEventListener('pointerdown', (e) => {
+                                    e.preventDefault(); // 入力欄からフォーカスが外れるのを防ぐ
+                                    this.dom.inputTitle.value = song.trackName;
+                                    this.dom.inputArtist.value = song.artistName;
+                                    this.dom.autocompleteList.style.display = 'none';
+                                });
+                                
+                                this.dom.autocompleteList.appendChild(li);
+                            });
+                            this.dom.autocompleteList.style.display = 'block';
+                        } else {
+                            this.dom.autocompleteList.style.display = 'none';
+                        }
+                    } catch (err) {
+                        console.error("Autocomplete fetch error:", err);
+                    }
+                }, 400);
+            }
+
+            async handleAddSong(e) {
+                e.preventDefault();
+                const newSong = {
+                    title: this.dom.inputTitle.value.trim(),
+                    artist: this.dom.inputArtist.value.trim(),
+                    category: this.dom.inputCategory.value.trim() || "未分類",
+                    tags: this.dom.inputTags.value.split(' ').map(t => t.trim()).filter(t => t),
+                    likes: 0,
+                    requestCount: 0,
+                    listenCount: 0,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                try {
+                    await db.collection("songs").add(newSong);
+                    this.dom.addForm.reset();
+                } catch(error) {
+                    console.error("追加エラー:", error);
+                    alert("曲の追加に失敗しました。");
+                }
+            }
+
+            handleCSVImport() {
+                const file = this.dom.csvFile.files[0];
+                if (!file) return alert("CSVファイルを選択してください。");
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const text = e.target.result;
+                    const lines = text.split('\n');
+                    let count = 0;
+                    const batch = db.batch();
+
+                    for (let index = 0; index < lines.length; index++) {
+                        const line = lines[index];
+                        if (index === 0 && line.includes('曲名')) continue;
+                        if (!line.trim()) continue;
+                        const cols = line.split(',');
+                        if (cols.length >= 2) {
+                            const newDocRef = db.collection("songs").doc();
+                            batch.set(newDocRef, {
+                                title: cols[0].trim(),
+                                artist: cols[1].trim(),
+                                category: (cols[2] && cols[2].trim()) ? cols[2].trim() : "未分類",
+                                tags: cols[3] ? cols[3].split(' ').map(t => t.trim()).filter(t => t) : [],
+                                likes: 0,
+                                requestCount: 0,
+                                listenCount: 0,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            count++;
+                        }
+                    }
+
+                    try {
+                        await batch.commit();
+                        this.dom.csvFile.value = '';
+                        alert(`${count}曲インポートしました！`);
+                    } catch (err) {
+                        console.error("インポートエラー:", err);
+                        alert("インポートに失敗しました。");
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            async deleteSong(id) {
+                if (confirm("本当に削除しますか？")) {
+                    try {
+                        await db.collection("songs").doc(id).delete();
+                    } catch(error) {
+                        console.error("削除エラー:", error);
+                    }
+                }
+            }
+
+            openEditModal(id) {
+                const song = this.songs.find(s => s.id === id);
+                if (!song) return;
+
+                this.dom.editSongId.value = song.id;
+                this.dom.editSongName.textContent = `${song.title} / ${song.artist}`;
+                this.dom.editCategory.value = song.category === "未分類" ? "" : song.category;
+                this.dom.editTags.value = song.tags.join(' ');
+
+                this.dom.editModal.classList.remove('hidden');
+                this.dom.editModal.classList.add('flex');
+            }
+
+            closeEditModal() {
+                this.dom.editModal.classList.add('hidden');
+                this.dom.editModal.classList.remove('flex');
+            }
+
+            async handleEditSong(e) {
+                e.preventDefault();
+                const id = this.dom.editSongId.value;
+                const category = this.dom.editCategory.value.trim() || "未分類";
+                const tags = this.dom.editTags.value.split(' ').map(t => t.trim()).filter(t => t);
+                
+                try {
+                    await db.collection("songs").doc(id).update({ category, tags });
+                    this.closeEditModal();
+                } catch(error) {
+                    console.error("更新エラー:", error);
+                    alert("更新に失敗しました。");
+                }
+            }
+
+            async toggleLike(id) {
+                const likedIndex = this.myActions.likes.indexOf(id);
+                const songRef = db.collection("songs").doc(id);
+                
+                try {
+                    if (likedIndex === -1) {
+                        this.myActions.likes.push(id);
+                        this.saveMyActions();
+                        await songRef.update({ likes: firebase.firestore.FieldValue.increment(1) });
+                    } else {
+                        this.myActions.likes.splice(likedIndex, 1);
+                        this.saveMyActions();
+                        await songRef.update({ likes: firebase.firestore.FieldValue.increment(-1) });
+                    }
+                    this.render(); 
+                } catch(error) {
+                    console.error("いいねエラー:", error);
+                }
+            }
+
+            async toggleRequest(id) {
+                const reqIndex = this.myActions.requests.indexOf(id);
+                const songRef = db.collection("songs").doc(id);
+                
+                try {
+                    if (reqIndex === -1) {
+                        this.myActions.requests.push(id);
+                        this.saveMyActions();
+                        await songRef.update({ requestCount: firebase.firestore.FieldValue.increment(1) });
+                    } else {
+                        this.myActions.requests.splice(reqIndex, 1);
+                        this.saveMyActions();
+                        await songRef.update({ requestCount: firebase.firestore.FieldValue.increment(-1) });
+                    }
+                    this.render(); 
+                } catch(error) {
+                    console.error("リクエストエラー:", error);
+                }
+            }
+
+            updateCategoryOptions() {
+                const categories = [...new Set(this.songs.map(s => s.category))].filter(c => c);
+                const currentVal = this.dom.filterCategory.value;
+                this.dom.filterCategory.innerHTML = '<option value="">全てのカテゴリー</option>';
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    this.dom.filterCategory.appendChild(option);
+                });
+                if (categories.includes(currentVal)) {
+                    this.dom.filterCategory.value = currentVal;
+                }
+            }
+
+            handleDashSort(key) {
+                if (this.dashSort.key === key) {
+                    this.dashSort.order = this.dashSort.order === 'desc' ? 'asc' : 'desc';
+                } else {
+                    this.dashSort.key = key;
+                    this.dashSort.order = 'desc';
+                }
+                this.isDashExpanded = false;
+                this.renderDashboard();
+            }
+
+            renderDashboard() {
+                if (!this.isAdmin) return;
+
+                const totalSongs = this.songs.length;
+                const totalLikes = this.songs.reduce((sum, song) => sum + song.likes, 0);
+                const totalRequests = this.songs.reduce((sum, song) => sum + (song.requestCount || 0), 0);
+                const totalListens = this.songs.reduce((sum, song) => sum + (song.listenCount || 0), 0);
+
+                this.dom.dashTotalSongs.textContent = totalSongs;
+                this.dom.dashTotalLikes.textContent = totalLikes;
+                this.dom.dashRequested.textContent = totalRequests;
+                this.dom.dashTotalListens.textContent = totalListens;
+
+                const getSortIcon = (key) => {
+                    if (this.dashSort.key !== key) return '<i class="fa-solid fa-sort ml-1 text-slate-600 opacity-50"></i>';
+                    return this.dashSort.order === 'desc' 
+                        ? '<i class="fa-solid fa-sort-down ml-1 text-pink-400"></i>' 
+                        : '<i class="fa-solid fa-sort-up ml-1 text-cyan-400"></i>';
+                };
+
+                this.dom.dashTableHeader.innerHTML = `
+                    <th class="px-2 py-2 font-semibold text-left">曲名 / アーティスト</th>
+                    <th class="px-1 py-2 font-semibold text-center cursor-pointer hover:bg-slate-700/50 transition duration-200" onclick="app.handleDashSort('requestCount')">
+                        <div class="flex items-center justify-center">
+                            <i class="fa-solid fa-hand-sparkles text-orange-400 mr-1"></i>Req ${getSortIcon('requestCount')}
+                        </div>
+                    </th>
+                    <th class="px-1 py-2 font-semibold text-center cursor-pointer hover:bg-slate-700/50 transition duration-200" onclick="app.handleDashSort('listenCount')">
+                        <div class="flex items-center justify-center">
+                            <i class="fa-brands fa-youtube text-red-400 mr-1"></i>再生 ${getSortIcon('listenCount')}
+                        </div>
+                    </th>
+                    <th class="px-1 py-2 font-semibold text-center cursor-pointer hover:bg-slate-700/50 transition duration-200" onclick="app.handleDashSort('likes')">
+                        <div class="flex items-center justify-center">
+                            <i class="fa-solid fa-heart text-pink-500 mr-1"></i>Like ${getSortIcon('likes')}
+                        </div>
+                    </th>
+                `;
+
+                const sortedSongs = [...this.songs].sort((a, b) => {
+                    const valA = this.dashSort.key === 'requestCount' ? (a.requestCount || 0) : 
+                                 this.dashSort.key === 'listenCount' ? (a.listenCount || 0) : a.likes;
+                    const valB = this.dashSort.key === 'requestCount' ? (b.requestCount || 0) : 
+                                 this.dashSort.key === 'listenCount' ? (b.listenCount || 0) : b.likes;
+                    
+                    if (valA !== valB) return this.dashSort.order === 'desc' ? valB - valA : valA - valB;
+                    
+                    const subValA = (a.requestCount || 0);
+                    const subValB = (b.requestCount || 0);
+                    return subValB - subValA;
+                });
+                
+                const displayLimit = 10;
+                const showSongs = this.isDashExpanded ? sortedSongs : sortedSongs.slice(0, displayLimit);
+
+                this.dom.dashTableBody.innerHTML = '';
+                
+                showSongs.forEach(song => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-800/80 transition-colors";
+                    
+                    const reqCountHtml = song.requestCount > 0 
+                        ? `<span class="text-orange-400 font-black">${song.requestCount}</span>`
+                        : `<span class="text-slate-600 font-bold">-</span>`;
+
+                    const listenCountHtml = (song.listenCount || 0) > 0 
+                        ? `<span class="text-red-400 font-black">${song.listenCount}</span>`
+                        : `<span class="text-slate-600 font-bold">-</span>`;
+
+                    tr.innerHTML = `
+                        <td class="px-2 py-2">
+                            <div class="font-bold text-slate-200 truncate max-w-[110px]">${song.title}</div>
+                            <div class="text-[9px] text-slate-500 truncate max-w-[110px]">${song.artist}</div>
+                        </td>
+                        <td class="px-1 py-2 text-center ${this.dashSort.key === 'requestCount' ? 'bg-slate-800/50' : ''}">${reqCountHtml}</td>
+                        <td class="px-1 py-2 text-center ${this.dashSort.key === 'listenCount' ? 'bg-slate-800/50' : ''}">${listenCountHtml}</td>
+                        <td class="px-1 py-2 text-center font-bold ${this.dashSort.key === 'likes' ? 'bg-slate-800/50' : ''}">
+                            <span class="${song.likes > 0 ? 'text-pink-400' : 'text-slate-600'}">${song.likes > 0 ? song.likes : '-'}</span>
+                        </td>
+                    `;
+                    this.dom.dashTableBody.appendChild(tr);
+                });
+
+                if (sortedSongs.length > displayLimit) {
+                    this.dom.dashExpandContainer.classList.remove('hidden');
+                    const hiddenCount = sortedSongs.length - displayLimit;
+                    this.dom.dashExpandBtn.innerHTML = this.isDashExpanded 
+                        ? '<i class="fa-solid fa-chevron-up mr-1.5"></i>閉じる' 
+                        : `<i class="fa-solid fa-chevron-down mr-1.5"></i>さらに表示（残り${hiddenCount}曲）`;
+                } else {
+                    this.dom.dashExpandContainer.classList.add('hidden');
+                }
+            }
+
+            render() {
+                const keyword = this.dom.searchKeyword.value.toLowerCase();
+                const category = this.dom.filterCategory.value;
+                const sort = this.dom.sortType.value;
+
+                let filtered = this.songs.filter(song => {
+                    const matchKeyword = song.title.toLowerCase().includes(keyword) || 
+                                         song.artist.toLowerCase().includes(keyword) ||
+                                         song.tags.join(' ').toLowerCase().includes(keyword);
+                    const matchCategory = category ? song.category === category : true;
+                    return matchKeyword && matchCategory;
+                });
+
+                filtered.sort((a, b) => {
+                    if (sort === 'newest') return b.createdAt - a.createdAt;
+                    if (sort === 'likes') {
+                        const scoreA = a.likes + ((a.requestCount || 0) * 100);
+                        const scoreB = b.likes + ((b.requestCount || 0) * 100);
+                        return scoreB - scoreA;
+                    }
+                    if (sort === 'syllabary') return a.title.localeCompare(b.title, 'ja');
+                    return 0;
+                });
+
+                this.dom.songCount.textContent = filtered.length;
+                this.dom.songList.innerHTML = '';
+
+                this.renderDashboard();
+
+                if (filtered.length === 0) {
+                    this.dom.songList.innerHTML = `
+                        <div class="text-center text-slate-500 py-10 bg-slate-800/50 rounded-2xl border border-slate-700">
+                            <i class="fa-solid fa-ghost text-3xl mb-2 opacity-50"></i>
+                            <p class="font-bold text-sm">見つかりませんでした</p>
+                        </div>`;
+                    return;
+                }
+
+                filtered.forEach(song => {
+                    const isLikedByMe = this.myActions.likes.includes(song.id);
+                    const isRequestedByMe = this.myActions.requests.includes(song.id);
+                    const hasRequests = (song.requestCount || 0) > 0;
+
+                    const cardStyle = hasRequests 
+                        ? 'bg-gradient-to-br from-slate-800 to-slate-900 border-orange-500/40 shadow-[0_2px_15px_rgba(249,115,22,0.15)]' 
+                        : 'bg-slate-800 border-white/5 shadow-sm';
+                    
+                    const card = document.createElement('div');
+                    card.className = `rounded-2xl p-3 border relative overflow-hidden transition-all duration-300 ${cardStyle}`;
+                    
+                    const glowEffect = hasRequests 
+                        ? `<div class="absolute -top-6 -left-6 w-16 h-16 bg-orange-500/15 rounded-full blur-xl pointer-events-none"></div>` 
+                        : '';
+
+                    const tagsHtml = song.tags.map(t => `<span class="bg-slate-700/80 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 rounded text-[9px] font-bold backdrop-blur-sm whitespace-nowrap">#${t}</span>`).join('');
+                    
+                    const editBtnHtml = this.isAdmin ? `<button onclick="app.openEditModal('${song.id}')" class="active-scale text-slate-500 hover:text-blue-400 bg-slate-900/50 w-6 h-6 rounded-full flex items-center justify-center transition shrink-0 ml-1"><i class="fa-solid fa-pen text-[10px]"></i></button>` : '';
+                    const deleteBtnHtml = this.isAdmin ? `<button onclick="app.deleteSong('${song.id}')" class="active-scale text-slate-500 hover:text-red-400 bg-slate-900/50 w-6 h-6 rounded-full flex items-center justify-center transition shrink-0 ml-1"><i class="fa-solid fa-trash text-[10px]"></i></button>` : '';
+
+                    const reqBtnClass = isRequestedByMe 
+                        ? 'bg-gradient-to-r from-pink-500 to-orange-400 text-white shadow-md shadow-orange-500/40 border-none' 
+                        : 'bg-slate-700/50 text-slate-300 border border-slate-600 hover:bg-slate-700';
+
+                    card.innerHTML = `
+                        ${glowEffect}
+                        <div class="relative z-10 flex flex-col h-full">
+                            
+                            <div class="flex justify-between items-start mb-1.5">
+                                <div class="flex items-center gap-1.5 flex-wrap flex-1 pr-2">
+                                    <span class="bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-1.5 py-0.5 rounded text-[9px] font-extrabold tracking-wider shadow-sm whitespace-nowrap">
+                                        ${song.category}
+                                    </span>
+                                    ${tagsHtml}
+                                </div>
+                                <div class="flex items-center">
+                                    ${editBtnHtml}
+                                    ${deleteBtnHtml}
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-end mb-2">
+                                <div class="flex-1 min-w-0 pr-2">
+                                    <h3 class="text-base font-black text-white leading-tight tracking-tight truncate">${song.title}</h3>
+                                    <p class="text-[11px] text-slate-400 font-medium truncate mt-0.5"><i class="fa-solid fa-microphone-lines text-[9px] mr-1 opacity-70"></i>${song.artist}</p>
+                                </div>
+                                <button onclick="app.openYouTubeSearch('${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}')" class="active-scale shrink-0 inline-flex items-center justify-center bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 px-2 py-1 rounded text-[9px] font-bold transition-colors">
+                                    <i class="fa-brands fa-youtube text-[10px] mr-1"></i> 聴く
+                                </button>
+                            </div>
+                            
+                            <div class="flex items-center justify-between pt-2 mt-auto border-t border-slate-700/50">
+                                <button onclick="app.toggleLike('${song.id}')" class="active-scale text-slate-400 hover:text-pink-400 transition flex items-center gap-1 bg-slate-900/40 px-2.5 py-1 rounded-full border border-slate-700/50">
+                                    <i class="fa-solid fa-heart text-[10px] ${isLikedByMe ? 'text-pink-500 drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]' : ''}"></i> 
+                                    <span class="text-xs font-bold ${isLikedByMe ? 'text-white' : ''}">${song.likes > 0 ? song.likes : 'いいね'}</span>
+                                </button>
+                                
+                                <button onclick="app.toggleRequest('${song.id}')" class="active-scale px-3 py-1 rounded-full text-[10px] font-bold transition flex items-center gap-1 ${reqBtnClass}">
+                                    <i class="fa-solid ${isRequestedByMe ? 'fa-check' : 'fa-hand-sparkles'} text-[10px]"></i> 
+                                    ${isRequestedByMe ? 'リクエスト済' : 'リクエスト'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    this.dom.songList.appendChild(card);
+                });
+            }
+        }
+
+        const songApp = new SongListApp();
+    </script>
+</body>
+</html>
