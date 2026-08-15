@@ -11,7 +11,6 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
 
-        /* 修正: absolute（浮かす設定）を削除し、下の要素を押し下げる安全な設計に変更 */
         .autocomplete-dropdown {
             margin-top: 0.5rem; background: #1e293b; border: 1px solid #334155;
             border-radius: 1rem; max-height: 200px; overflow-y: auto; width: 100%;
@@ -91,88 +90,92 @@
             </section>
 
             <!-- 管理エリア -->
-            <section id="admin-area" class="bg-slate-800/80 rounded-2xl p-4 mb-6 hidden border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] relative overflow-hidden">
-                <div class="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
-                <h2 class="text-base font-extrabold mb-4 text-white flex items-center relative z-10">
-                    <i class="fa-solid fa-bolt text-purple-400 mr-2"></i> CREATOR STUDIO
-                </h2>
-
-                <div class="mb-6 relative z-10">
-                    <h3 class="text-xs font-bold text-white mb-2 flex items-center">
-                        <i class="fa-solid fa-chart-pie mr-2 text-cyan-400"></i> ダッシュボード
-                    </h3>
-                    <div class="grid grid-cols-2 gap-2 mb-3">
-                        <div class="bg-slate-900/50 rounded-xl p-2 border border-slate-700/50 text-center flex flex-col justify-center">
-                            <div class="text-[9px] text-slate-400 mb-0.5 font-bold">登録曲数</div>
-                            <div class="text-lg font-black text-white" id="dash-total-songs">0</div>
-                        </div>
-                        <div class="bg-slate-900/50 rounded-xl p-2 border border-pink-500/30 text-center relative overflow-hidden">
-                            <div class="text-[9px] text-pink-300/80 mb-0.5 font-bold relative z-10">総いいね</div>
-                            <div class="text-lg font-black text-pink-400 relative z-10" id="dash-total-likes">0</div>
-                        </div>
-                        <div class="bg-slate-900/50 rounded-xl p-2 border border-orange-500/30 text-center relative overflow-hidden">
-                            <div class="text-[9px] text-orange-300/80 mb-0.5 font-bold relative z-10">総リクエスト</div>
-                            <div class="text-lg font-black text-orange-400 relative z-10" id="dash-requested">0</div>
-                        </div>
-                        <div class="bg-slate-900/50 rounded-xl p-2 border border-red-500/30 text-center relative overflow-hidden">
-                            <div class="text-[9px] text-red-300/80 mb-0.5 font-bold relative z-10">総再生(聴く)</div>
-                            <div class="text-lg font-black text-red-400 relative z-10" id="dash-total-listens">0</div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm whitespace-nowrap">
-                                <thead class="bg-slate-800/80 text-slate-400 text-[9px] uppercase tracking-wider border-b border-slate-700/50">
-                                    <tr id="dash-table-header"></tr>
-                                </thead>
-                                <tbody id="dash-table-body" class="divide-y divide-slate-700/50 text-[10px]"></tbody>
-                            </table>
-                        </div>
-                        <div id="dash-expand-container" class="border-t border-slate-700/50 p-1.5 text-center hidden bg-slate-800/30">
-                            <button id="dash-expand-btn" class="active-scale text-[10px] text-cyan-400 hover:text-cyan-300 font-bold py-1 px-3 rounded-full transition w-full flex justify-center items-center"></button>
-                        </div>
-                    </div>
+            <section id="admin-area" class="bg-slate-800/80 rounded-2xl p-4 mb-6 hidden border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] relative z-40">
+                <div class="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl"></div>
                 </div>
-                
-                <div class="space-y-5 relative z-10">
-                    <div class="grid grid-cols-1 gap-3 pb-4 border-b border-slate-700/50">
-                        <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
-                            <h3 class="text-[11px] font-bold text-slate-300 mb-2"><i class="fa-solid fa-file-csv mr-1 text-green-400"></i> 一括インポート</h3>
-                            <div class="flex items-center gap-2">
-                                <input type="file" id="csv-file" accept=".csv" class="text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 w-full">
-                                <button id="import-btn" class="active-scale bg-green-500/20 text-green-400 border border-green-500/30 px-2.5 py-1 rounded-full text-[10px] font-bold">追加</button>
+
+                <div class="relative z-10">
+                    <h2 class="text-base font-extrabold mb-4 text-white flex items-center">
+                        <i class="fa-solid fa-bolt text-purple-400 mr-2"></i> CREATOR STUDIO
+                    </h2>
+
+                    <div class="mb-6">
+                        <h3 class="text-xs font-bold text-white mb-2 flex items-center">
+                            <i class="fa-solid fa-chart-pie mr-2 text-cyan-400"></i> ダッシュボード
+                        </h3>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <div class="bg-slate-900/50 rounded-xl p-2 border border-slate-700/50 text-center flex flex-col justify-center">
+                                <div class="text-[9px] text-slate-400 mb-0.5 font-bold">登録曲数</div>
+                                <div class="text-lg font-black text-white" id="dash-total-songs">0</div>
+                            </div>
+                            <div class="bg-slate-900/50 rounded-xl p-2 border border-pink-500/30 text-center relative overflow-hidden">
+                                <div class="text-[9px] text-pink-300/80 mb-0.5 font-bold relative z-10">総いいね</div>
+                                <div class="text-lg font-black text-pink-400 relative z-10" id="dash-total-likes">0</div>
+                            </div>
+                            <div class="bg-slate-900/50 rounded-xl p-2 border border-orange-500/30 text-center relative overflow-hidden">
+                                <div class="text-[9px] text-orange-300/80 mb-0.5 font-bold relative z-10">総リクエスト</div>
+                                <div class="text-lg font-black text-orange-400 relative z-10" id="dash-requested">0</div>
+                            </div>
+                            <div class="bg-slate-900/50 rounded-xl p-2 border border-red-500/30 text-center relative overflow-hidden">
+                                <div class="text-[9px] text-red-300/80 mb-0.5 font-bold relative z-10">総再生(聴く)</div>
+                                <div class="text-lg font-black text-red-400 relative z-10" id="dash-total-listens">0</div>
                             </div>
                         </div>
                         
-                        <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
-                            <h3 class="text-[11px] font-bold text-slate-300 mb-2"><i class="fa-solid fa-key mr-1 text-yellow-400"></i> パスワード変更</h3>
-                            <form id="change-pass-form" class="flex items-center gap-2">
-                                <input type="text" id="input-new-pass" required class="bg-slate-800 border border-slate-600 rounded-full px-3 py-1 text-base text-white w-full focus:outline-none focus:border-yellow-500" placeholder="新しいパスワード">
-                                <button type="submit" class="active-scale bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2.5 py-1 rounded-full text-[10px] font-bold">更新</button>
-                            </form>
+                        <div class="bg-slate-900/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm whitespace-nowrap">
+                                    <thead class="bg-slate-800/80 text-slate-400 text-[9px] uppercase tracking-wider border-b border-slate-700/50">
+                                        <tr id="dash-table-header"></tr>
+                                    </thead>
+                                    <tbody id="dash-table-body" class="divide-y divide-slate-700/50 text-[10px]"></tbody>
+                                </table>
+                            </div>
+                            <div id="dash-expand-container" class="border-t border-slate-700/50 p-1.5 text-center hidden bg-slate-800/30">
+                                <button id="dash-expand-btn" class="active-scale text-[10px] text-cyan-400 hover:text-cyan-300 font-bold py-1 px-3 rounded-full transition w-full flex justify-center items-center"></button>
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <h3 class="text-xs font-bold text-white mb-2"><i class="fa-solid fa-plus-circle mr-1 text-pink-400"></i> 新規曲登録</h3>
-                        <form id="add-song-form" class="space-y-3">
-                            <div class="relative z-50">
-                                <!-- iOSの強制ズームを防ぐため text-base 指定 -->
-                                <input type="text" id="input-title" required autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="曲名 (入力で自動検索)">
-                                <!-- サジェストリスト（浮かないように変更） -->
-                                <ul id="autocomplete-list" class="autocomplete-dropdown"></ul>
+                    
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-1 gap-3 pb-4 border-b border-slate-700/50">
+                            <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                                <h3 class="text-[11px] font-bold text-slate-300 mb-2"><i class="fa-solid fa-file-csv mr-1 text-green-400"></i> 一括インポート</h3>
+                                <div class="flex items-center gap-2">
+                                    <input type="file" id="csv-file" accept=".csv" class="text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-600 w-full">
+                                    <button id="import-btn" class="active-scale bg-green-500/20 text-green-400 border border-green-500/30 px-2.5 py-1 rounded-full text-[10px] font-bold">追加</button>
+                                </div>
                             </div>
-                            <div class="relative z-40">
-                                <input type="text" id="input-artist" required autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="アーティスト名">
+                            
+                            <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                                <h3 class="text-[11px] font-bold text-slate-300 mb-2"><i class="fa-solid fa-key mr-1 text-yellow-400"></i> パスワード変更</h3>
+                                <form id="change-pass-form" class="flex items-center gap-2">
+                                    <input type="text" id="input-new-pass" required class="bg-slate-800 border border-slate-600 rounded-full px-3 py-1 text-base text-white w-full focus:outline-none focus:border-yellow-500" placeholder="新しいパスワード">
+                                    <button type="submit" class="active-scale bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2.5 py-1 rounded-full text-[10px] font-bold">更新</button>
+                                </form>
                             </div>
-                            <div class="flex gap-2 relative z-30">
-                                <input type="text" id="input-category" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="カテゴリ (任意)">
-                                <input type="text" id="input-tags" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="タグ (任意)">
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-bold text-white mb-2"><i class="fa-solid fa-plus-circle mr-1 text-pink-400"></i> 新規曲登録</h3>
+                            <div id="add-song-container" class="space-y-3 relative">
+                                <div class="relative z-50">
+                                    <input type="text" id="input-title" autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="曲名 (入力で自動検索)">
+                                    <ul id="autocomplete-list" class="autocomplete-dropdown"></ul>
+                                </div>
+                                <div class="relative z-40">
+                                    <input type="text" id="input-artist" autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="アーティスト名">
+                                </div>
+                                <div class="flex gap-2 relative z-30">
+                                    <input type="text" id="input-category" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="カテゴリ (任意)">
+                                    <input type="text" id="input-tags" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-base text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="タグ (任意)">
+                                </div>
+                                <button type="button" id="add-song-btn" class="active-scale w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white font-extrabold py-2.5 rounded-xl shadow-lg shadow-pink-500/30 flex justify-center items-center gap-1.5 text-sm relative z-20">
+                                    <i class="fa-solid fa-music"></i> 追加する
+                                </button>
                             </div>
-                            <button type="submit" class="active-scale w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 text-white font-extrabold py-2.5 rounded-xl shadow-lg shadow-pink-500/30 flex justify-center items-center gap-1.5 text-sm relative z-20">
-                                <i class="fa-solid fa-music"></i> 追加する
-                            </button>
-                        </form>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -244,6 +247,8 @@
                 this.dashSort = { key: 'requestCount', order: 'desc' };
                 this.isDashExpanded = false;
                 this.searchTimeout = null;
+                this.isComposing = false;
+                this.abortController = null; // ★追加：通信キャンセル用のコントローラー
 
                 this.dom = {
                     authBtn: document.getElementById('auth-btn'),
@@ -260,7 +265,7 @@
                     importBtn: document.getElementById('import-btn'),
                     changePassForm: document.getElementById('change-pass-form'),
                     inputNewPass: document.getElementById('input-new-pass'),
-                    addForm: document.getElementById('add-song-form'),
+                    addSongBtn: document.getElementById('add-song-btn'),
                     inputTitle: document.getElementById('input-title'),
                     inputArtist: document.getElementById('input-artist'),
                     inputCategory: document.getElementById('input-category'),
@@ -328,20 +333,34 @@
             bindEvents() {
                 this.dom.authBtn.addEventListener('click', () => this.toggleAuth());
                 this.dom.changePassForm.addEventListener('submit', (e) => this.handleChangePassword(e));
-                this.dom.addForm.addEventListener('submit', (e) => this.handleAddSong(e));
+                
+                this.dom.addSongBtn.addEventListener('click', () => this.handleAddSong());
                 this.dom.importBtn.addEventListener('click', () => this.handleCSVImport());
                 
-                this.dom.inputTitle.addEventListener('input', (e) => this.handleAutocomplete(e.target.value));
-                
-                // 画面外を触った時にリストを閉じる
-                const closeAutocomplete = (e) => {
+                // Simeji IME対応
+                this.dom.inputTitle.addEventListener('compositionstart', () => {
+                    this.isComposing = true;
+                });
+                this.dom.inputTitle.addEventListener('compositionend', (e) => {
+                    this.isComposing = false;
+                    this.handleAutocomplete(e.target.value);
+                });
+                this.dom.inputTitle.addEventListener('input', (e) => {
+                    if (!this.isComposing) {
+                        this.handleAutocomplete(e.target.value);
+                    }
+                });
+                this.dom.inputTitle.addEventListener('focus', (e) => {
+                    if (e.target.value.trim() !== '') {
+                        this.handleAutocomplete(e.target.value);
+                    }
+                });
+
+                document.addEventListener('click', (e) => {
                     if (e.target !== this.dom.inputTitle && !this.dom.autocompleteList.contains(e.target)) {
                         this.dom.autocompleteList.style.display = 'none';
                     }
-                };
-                document.addEventListener('click', closeAutocomplete);
-                document.addEventListener('touchstart', closeAutocomplete, { passive: true });
-                // ※誤作動の元だった blur イベントは完全に削除しました。
+                });
 
                 this.dom.searchKeyword.addEventListener('input', () => this.render());
                 this.dom.filterCategory.addEventListener('change', () => this.render());
@@ -412,20 +431,32 @@
                 this.render();
             }
 
+            // ★ 修正：AbortControllerを用いて通信の重複をキャンセルし、iTunes APIを直接叩く
             handleAutocomplete(keyword) {
                 clearTimeout(this.searchTimeout);
+                
+                // 前回の検索通信がまだ終わっていなければキャンセルする
+                if (this.abortController) {
+                    this.abortController.abort();
+                }
+
                 if (!keyword.trim()) {
                     this.dom.autocompleteList.style.display = 'none';
                     return;
                 }
 
-                // 【追加】検索中の視覚的フィードバック（エラーがないのに出ないのかを判別するため）
                 this.dom.autocompleteList.innerHTML = `<li class="text-center text-slate-400 text-xs py-3"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>検索中...</li>`;
                 this.dom.autocompleteList.style.display = 'block';
 
+                // 待機時間を 400ms に短縮
                 this.searchTimeout = setTimeout(async () => {
+                    this.abortController = new AbortController(); // 新しい通信用のコントローラー
+                    
                     try {
-                        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&media=music&entity=song&lang=ja_jp&country=JP&limit=5`);
+                        // 不安定なプロキシを廃止し、iTunes APIを直接叩く
+                        const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&media=music&entity=song&lang=ja_jp&country=JP&limit=5`;
+
+                        const res = await fetch(targetUrl, { signal: this.abortController.signal });
                         if (!res.ok) throw new Error('API Error');
                         const data = await res.json();
                         
@@ -433,8 +464,7 @@
                         if (data.results && data.results.length > 0) {
                             data.results.forEach(song => {
                                 const li = document.createElement('li');
-                                // pointer-events-none を外して全体をタップ可能に
-                                li.innerHTML = `<div class="font-bold text-sm truncate">${song.trackName}</div><div class="text-[10px] text-slate-400 truncate">${song.artistName}</div>`;
+                                li.innerHTML = `<div class="font-bold text-sm truncate pointer-events-none">${song.trackName}</div><div class="text-[10px] text-slate-400 truncate pointer-events-none">${song.artistName}</div>`;
                                 
                                 const selectItem = (e) => {
                                     e.preventDefault(); 
@@ -444,26 +474,26 @@
                                     this.dom.autocompleteList.style.display = 'none';
                                 };
                                 
-                                li.addEventListener('mousedown', selectItem);
-                                li.addEventListener('touchstart', selectItem, { passive: false });
+                                li.addEventListener('pointerdown', selectItem);
+                                li.addEventListener('mousedown', selectItem); 
                                 
                                 this.dom.autocompleteList.appendChild(li);
                             });
                             this.dom.autocompleteList.style.display = 'block';
                         } else {
-                            // 結果が0件の場合のフィードバック
                             this.dom.autocompleteList.innerHTML = `<li class="text-center text-slate-400 text-xs py-3">候補が見つかりません</li>`;
                         }
                     } catch (err) {
+                        // AbortError(通信のキャンセル)の場合はエラーとして扱わない
+                        if (err.name === 'AbortError') return;
+
                         console.error("Autocomplete fetch error:", err);
-                        // 通信エラーの場合のフィードバック
-                        this.dom.autocompleteList.innerHTML = `<li class="text-center text-red-400 text-xs py-3"><i class="fa-solid fa-triangle-exclamation mr-2"></i>検索エラー (通信を確認してください)</li>`;
+                        this.dom.autocompleteList.innerHTML = `<li class="text-center text-red-400 text-xs py-3"><i class="fa-solid fa-triangle-exclamation mr-2"></i>通信エラー (時間をおいてお試しください)</li>`;
                     }
-                }, 400);
+                }, 400); 
             }
 
-            async handleAddSong(e) {
-                e.preventDefault();
+            async handleAddSong() {
                 const title = this.dom.inputTitle.value.trim();
                 const artist = this.dom.inputArtist.value.trim();
                 
