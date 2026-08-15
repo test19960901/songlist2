@@ -11,15 +11,13 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
 
-        /* サジェストリストのデザイン */
         .autocomplete-dropdown {
-            position: absolute; z-index: 999; background: #1e293b; border: 1px solid #334155;
+            position: absolute; z-index: 50; background: #1e293b; border: 1px solid #334155;
             border-radius: 1rem; max-height: 200px; overflow-y: auto; width: 100%;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7); display: none; color: white; top: calc(100% + 4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); display: none; color: white; top: calc(100% + 4px);
         }
         .autocomplete-dropdown li { padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid #334155; }
-        .autocomplete-dropdown li:last-child { border-bottom: none; }
-        .autocomplete-dropdown li:hover, .autocomplete-dropdown li:active { background-color: #334155; }
+        .autocomplete-dropdown li:hover { background-color: #334155; }
 
         .glass-header {
             background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -89,19 +87,15 @@
                 </div>
             </section>
 
-            <!-- 管理エリア (修正: overflow-hidden を外し、内部にラッパーを追加) -->
-            <section id="admin-area" class="bg-slate-800/80 rounded-2xl p-4 mb-6 hidden border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] relative z-40">
-                <!-- 光彩エフェクト専用のオーバーフロー隠しラッパー -->
-                <div class="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
-                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl"></div>
-                </div>
-
-                <h2 class="text-base font-extrabold mb-4 text-white flex items-center relative z-10">
+            <!-- 管理エリア -->
+            <section id="admin-area" class="bg-slate-800/80 rounded-2xl p-4 mb-6 hidden border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                <h2 class="text-base font-extrabold mb-4 text-white flex items-center">
                     <i class="fa-solid fa-bolt text-purple-400 mr-2"></i> CREATOR STUDIO
                 </h2>
 
                 <!-- インサイト・ダッシュボード -->
-                <div class="mb-6 relative z-10">
+                <div class="mb-6">
                     <h3 class="text-xs font-bold text-white mb-2 flex items-center">
                         <i class="fa-solid fa-chart-pie mr-2 text-cyan-400"></i> ダッシュボード
                     </h3>
@@ -111,16 +105,16 @@
                             <div class="text-lg font-black text-white" id="dash-total-songs">0</div>
                         </div>
                         <div class="bg-slate-900/50 rounded-xl p-2 border border-pink-500/30 text-center relative overflow-hidden">
-                            <div class="text-[9px] text-pink-300/80 mb-0.5 font-bold relative z-10">総いいね</div>
-                            <div class="text-lg font-black text-pink-400 relative z-10" id="dash-total-likes">0</div>
+                            <div class="text-[9px] text-pink-300/80 mb-0.5 font-bold">総いいね</div>
+                            <div class="text-lg font-black text-pink-400" id="dash-total-likes">0</div>
                         </div>
                         <div class="bg-slate-900/50 rounded-xl p-2 border border-orange-500/30 text-center relative overflow-hidden">
-                            <div class="text-[9px] text-orange-300/80 mb-0.5 font-bold relative z-10">総リクエスト</div>
-                            <div class="text-lg font-black text-orange-400 relative z-10" id="dash-requested">0</div>
+                            <div class="text-[9px] text-orange-300/80 mb-0.5 font-bold">総リクエスト</div>
+                            <div class="text-lg font-black text-orange-400" id="dash-requested">0</div>
                         </div>
                         <div class="bg-slate-900/50 rounded-xl p-2 border border-red-500/30 text-center relative overflow-hidden">
-                            <div class="text-[9px] text-red-300/80 mb-0.5 font-bold relative z-10">総再生(聴く)</div>
-                            <div class="text-lg font-black text-red-400 relative z-10" id="dash-total-listens">0</div>
+                            <div class="text-[9px] text-red-300/80 mb-0.5 font-bold">総再生(聴く)</div>
+                            <div class="text-lg font-black text-red-400" id="dash-total-listens">0</div>
                         </div>
                     </div>
                     
@@ -140,7 +134,7 @@
                 </div>
                 
                 <!-- 登録・設定フォーム -->
-                <div class="space-y-5 relative z-10">
+                <div class="space-y-5">
                     <div class="grid grid-cols-1 gap-3 pb-4 border-b border-slate-700/50">
                         <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
                             <h3 class="text-[11px] font-bold text-slate-300 mb-2"><i class="fa-solid fa-file-csv mr-1 text-green-400"></i> 一括インポート</h3>
@@ -160,11 +154,10 @@
                     </div>
                     <div>
                         <h3 class="text-xs font-bold text-white mb-2"><i class="fa-solid fa-plus-circle mr-1 text-pink-400"></i> 新規曲登録</h3>
-                        <form id="add-song-form" class="space-y-3 relative">
+                        <form id="add-song-form" class="space-y-3">
                             <div class="relative">
-                                <!-- iOSでサジェストが出やすいようにautocomplete="off" -->
+                                <!-- iOS対応: autocomplete="off" を明示的に設定 -->
                                 <input type="text" id="input-title" required autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="曲名 (入力で自動検索)">
-                                <!-- サジェストリスト -->
                                 <ul id="autocomplete-list" class="autocomplete-dropdown"></ul>
                             </div>
                             <input type="text" id="input-artist" required autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-pink-500 placeholder-slate-500" placeholder="アーティスト名">
@@ -336,7 +329,14 @@
                 
                 this.dom.inputTitle.addEventListener('input', (e) => this.handleAutocomplete(e.target.value));
                 
-                // サジェストリスト以外を触った時に閉じる（blurだとiOSでバグるため遅延処理）
+                // 入力欄外を触った時にリストを閉じる（iOS対応）
+                document.addEventListener('click', (e) => {
+                    if (e.target !== this.dom.inputTitle && !this.dom.autocompleteList.contains(e.target)) {
+                        this.dom.autocompleteList.style.display = 'none';
+                    }
+                });
+                
+                // フォーカスが外れた時、少し遅らせてリストを閉じる（タップ判定を優先させるため）
                 this.dom.inputTitle.addEventListener('blur', () => {
                     setTimeout(() => {
                         this.dom.autocompleteList.style.display = 'none';
@@ -412,33 +412,34 @@
                 this.render();
             }
 
-            // iOS対応版 サジェスト機能（fetchを利用し、タッチイベントを強化）
+            // iOS Chrome/Safari対応のサジェスト検索（JSONP方式）
             handleAutocomplete(keyword) {
                 clearTimeout(this.searchTimeout);
                 if (!keyword.trim()) {
                     this.dom.autocompleteList.style.display = 'none';
                     return;
                 }
-
-                this.searchTimeout = setTimeout(async () => {
-                    try {
-                        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&media=music&entity=song&lang=ja_jp&country=JP&limit=5`);
-                        if (!res.ok) throw new Error('API Error');
-                        const data = await res.json();
-                        
+                
+                this.searchTimeout = setTimeout(() => {
+                    // JSONP用のユニークな関数名を生成
+                    const callbackName = 'itunesCallback_' + Date.now() + Math.floor(Math.random() * 1000);
+                    
+                    window[callbackName] = (data) => {
                         this.dom.autocompleteList.innerHTML = '';
-                        if (data.results && data.results.length > 0) {
+                        if (data && data.results && data.results.length > 0) {
                             data.results.forEach(song => {
                                 const li = document.createElement('li');
                                 li.innerHTML = `<div class="font-bold text-sm truncate">${song.trackName}</div><div class="text-[10px] text-slate-400 truncate">${song.artistName}</div>`;
                                 
-                                // iOSでのタップ判定抜けを防ぐため、pointerdownで即座に処理
-                                li.addEventListener('pointerdown', (e) => {
-                                    e.preventDefault(); // 入力欄からフォーカスが外れるのを防ぐ
+                                // タップした時の処理
+                                const onSelect = () => {
                                     this.dom.inputTitle.value = song.trackName;
                                     this.dom.inputArtist.value = song.artistName;
                                     this.dom.autocompleteList.style.display = 'none';
-                                });
+                                };
+                                
+                                li.addEventListener('click', onSelect);
+                                li.addEventListener('mousedown', onSelect);
                                 
                                 this.dom.autocompleteList.appendChild(li);
                             });
@@ -446,9 +447,18 @@
                         } else {
                             this.dom.autocompleteList.style.display = 'none';
                         }
-                    } catch (err) {
-                        console.error("Autocomplete fetch error:", err);
-                    }
+                        
+                        // 処理後のスクリプトタグと関数を削除（クリーンアップ）
+                        delete window[callbackName];
+                        const scriptEl = document.getElementById(callbackName);
+                        if (scriptEl) scriptEl.remove();
+                    };
+
+                    // スクリプトタグを生成してリクエスト送信
+                    const script = document.createElement('script');
+                    script.id = callbackName;
+                    script.src = `https://itunes.apple.com/search?term=${encodeURIComponent(keyword)}&media=music&entity=song&lang=ja_jp&country=JP&limit=5&callback=${callbackName}`;
+                    document.body.appendChild(script);
                 }, 400);
             }
 
@@ -468,6 +478,7 @@
                 try {
                     await db.collection("songs").add(newSong);
                     this.dom.addForm.reset();
+                    this.dom.autocompleteList.style.display = 'none';
                 } catch(error) {
                     console.error("追加エラー:", error);
                     alert("曲の追加に失敗しました。");
@@ -575,7 +586,7 @@
                         this.saveMyActions();
                         await songRef.update({ likes: firebase.firestore.FieldValue.increment(-1) });
                     }
-                    this.render(); 
+                    this.render();
                 } catch(error) {
                     console.error("いいねエラー:", error);
                 }
@@ -595,7 +606,7 @@
                         this.saveMyActions();
                         await songRef.update({ requestCount: firebase.firestore.FieldValue.increment(-1) });
                     }
-                    this.render(); 
+                    this.render();
                 } catch(error) {
                     console.error("リクエストエラー:", error);
                 }
